@@ -32,40 +32,56 @@ if (event.message.type === "image") {
 
   const fileName = `${Date.now()}-${messageId}.jpg`;
 
-  // inquiry取得 or 作成
-  let inquiryRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/inquiries?user_id=eq.${userId}&status=eq.collecting`,
-    {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-      },
-    }
-  );
+ const nowIso = new Date().toISOString();
+const threeMinutesAgoIso = new Date(Date.now() - 3 * 60 * 1000).toISOString();
 
-  let inquiries = await inquiryRes.json();
-  let inquiryId;
-
-  if (inquiries.length === 0) {
-    let createRes = await fetch(`${SUPABASE_URL}/rest/v1/inquiries`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        status: "collecting",
-      }),
-    });
-
-    let newInquiry = await createRes.json();
-    inquiryId = newInquiry[0].id;
-  } else {
-    inquiryId = inquiries[0].id;
+// 3分以内の collecting inquiry を探す
+let inquiryRes = await fetch(
+  `${SUPABASE_URL}/rest/v1/inquiries?user_id=eq.${userId}&status=eq.collecting&last_message_at=gte.${encodeURIComponent(threeMinutesAgoIso)}&order=created_at.desc&limit=1`,
+  {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
   }
+);
+
+let inquiries = await inquiryRes.json();
+let inquiryId;
+
+if (inquiries.length === 0) {
+  let createRes = await fetch(`${SUPABASE_URL}/rest/v1/inquiries`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      status: "collecting",
+      last_message_at: nowIso,
+    }),
+  });
+
+  let newInquiry = await createRes.json();
+  inquiryId = newInquiry[0].id;
+} else {
+  inquiryId = inquiries[0].id;
+
+  await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
+    body: JSON.stringify({
+      last_message_at: nowIso,
+    }),
+  });
+}
 
   // Supabase Storageに保存
   await fetch(
