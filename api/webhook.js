@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       const inquiries = await inquiryRes.json();
       let inquiryId = null;
 
-      // ② 1分以内なら既存 inquiry を再利用、そうでなければ新規作成
+      // ② 1分以内なら既存 inquiry を再利用
       if (inquiries.length > 0) {
         const latestInquiry = inquiries[0];
         const baseTime = latestInquiry.last_message_at || latestInquiry.created_at;
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
         }
       }
 
+      // ③ なければ新規作成
       if (!inquiryId) {
         const createRes = await fetch(`${SUPABASE_URL}/rest/v1/inquiries`, {
           method: "POST",
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
         inquiryId = newInquiry[0].id;
       }
 
-      // ③ テキスト保存
+      // ④ テキスト保存
       if (event.message.type === "text") {
         await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
           method: "POST",
@@ -80,11 +81,11 @@ export default async function handler(req, res) {
         });
       }
 
-      // ④ 画像保存
+      // ⑤ 画像保存
       if (event.message.type === "image") {
         const messageId = event.message.id;
 
-        // LINEから画像本体取得
+        // LINEから画像取得
         const imageRes = await fetch(
           `https://api-data.line.me/v2/bot/message/${messageId}/content`,
           {
@@ -132,7 +133,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // ⑤ 必ず last_message_at を更新
+      // ⑥ 最終受信時刻を更新
       await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
         method: "PATCH",
         headers: {
@@ -146,7 +147,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // 重要: 今はすぐ返信しない
     return res.status(200).json({ ok: true });
   } catch (error) {
     console.error("webhook error:", error);
