@@ -115,24 +115,6 @@ if (inquiries.length === 0) {
     }),
   });
 
-  // LINEに返信
-  await fetch("https://api.line.me/v2/bot/message/reply", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
-    },
-    body: JSON.stringify({
-      replyToken: replyToken,
-      messages: [
-        {
-          type: "text",
-          text: "お写真を受け付けました。",
-        },
-      ],
-    }),
-  });
-
   continue;
 }
       // ① inquiry取得 or 作成
