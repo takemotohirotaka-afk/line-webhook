@@ -5,11 +5,12 @@ export default async function handler(req, res) {
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
   try {
-    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+    const now = Date.now();
+    const oneMinuteMs = 60 * 1000;
 
-    // ① 1分経過 & 未返信の inquiry を取得
+    // ① collecting & 未返信 を全部取る
     const inquiryRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/inquiries?status=eq.collecting&last_message_at=lte.${encodeURIComponent(oneMinuteAgo)}&replied_at=is.null&order=created_at.asc`,
+      `${SUPABASE_URL}/rest/v1/inquiries?status=eq.collecting&replied_at=is.null&order=created_at.asc`,
       {
         headers: {
           apikey: SUPABASE_KEY,
@@ -18,13 +19,20 @@ export default async function handler(req, res) {
       }
     );
 
-    const inquiries = await inquiryRes.json();
+    const allInquiries = await inquiryRes.json();
+
+    // ② JS側で「1分経過したものだけ」に絞る
+    const inquiries = allInquiries.filter((inquiry) => {
+      const baseTime = inquiry.last_message_at || inquiry.created_at;
+      if (!baseTime) return false;
+      return now - new Date(baseTime).getTime() >= oneMinuteMs;
+    });
 
     for (const inquiry of inquiries) {
       const inquiryId = inquiry.id;
       const userId = inquiry.user_id;
 
-      // ② messages を取得
+      // ③ messages を取得
       const msgRes = await fetch(
         `${SUPABASE_URL}/rest/v1/messages?inquiry_id=eq.${inquiryId}&order=created_at.asc`,
         {
@@ -45,7 +53,6 @@ export default async function handler(req, res) {
         .filter((m) => m.type === "image" && m.image_url)
         .map((m) => m.image_url);
 
-      // ③ GPTに渡す入力を作る
       const userContent = [];
 
       userContent.push({
@@ -65,14 +72,12 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
         });
       }
 
-      // ④ デフォルト文
       let replyText = `お問い合わせありがとうございます。
 内容を確認いたしました。
 
 お写真をもとに査定を進めてまいります。
 追加で確認事項がある場合はご連絡させていただきます。`;
 
-      // ⑤ OpenAI で査定文生成
       if (OPENAI_API_KEY) {
         const aiRes = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -145,12 +150,11 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
         }
       }
 
-      // ⑥ 文字数制限
       if (replyText.length > 4500) {
         replyText = replyText.slice(0, 4500);
       }
 
-      // ⑦ LINEに push
+      // ④ LINEに push
       await fetch("https://api.line.me/v2/bot/message/push", {
         method: "POST",
         headers: {
@@ -168,7 +172,7 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
         }),
       });
 
-      // ⑧ 二重送信防止
+      // ⑤ 返信済みにする
       await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
         method: "PATCH",
         headers: {
@@ -183,7 +187,11 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
       });
     }
 
-    return res.status(200).json({ ok: true, count: inquiries.length });
+    return res.status(200).json({
+      ok: true,
+      count: inquiries.length,
+      total: allInquiries.length,
+    });
   } catch (error) {
     console.error("cron error:", error);
     return res.status(500).json({ ok: false, error: error.message });
