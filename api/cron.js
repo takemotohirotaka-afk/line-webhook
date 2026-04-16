@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   try {
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
 
-    // ① 1分経過 & 未返信 の inquiry を取得
+    // ① 1分経過 & 未返信の inquiry を取得
     const inquiryRes = await fetch(
       `${SUPABASE_URL}/rest/v1/inquiries?status=eq.collecting&last_message_at=lte.${encodeURIComponent(oneMinuteAgo)}&replied_at=is.null&order=created_at.asc`,
       {
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       const inquiryId = inquiry.id;
       const userId = inquiry.user_id;
 
-      // ② inquiry に紐づく messages を取得
+      // ② messages を取得
       const msgRes = await fetch(
         `${SUPABASE_URL}/rest/v1/messages?inquiry_id=eq.${inquiryId}&order=created_at.asc`,
         {
@@ -50,32 +50,13 @@ export default async function handler(req, res) {
 
       userContent.push({
         type: "input_text",
-        text: `以下の商品画像の査定をお願いします。
+        text: `以下はブランド査定のお問い合わせです。
 
-実務ベースでリアルな査定をしてください。
+ユーザーからのテキスト：
+${texts.length ? texts.join("\n") : "（テキストなし）"}
 
-【査定ルール】
-・中古買取相場ベースで出す
-・状態により±30%調整
-・人気ブランドは強気
-・ノーブランドは弱め
-
-【参考相場感】
-・ルイヴィトン バッグ：2万〜8万
-・シャネル バッグ：5万〜30万
-・エルメス バッグ：10万〜100万以上
-・カルティエ 小物：1万〜5万
-・ロレックス 時計：30万〜300万
-・オメガ 時計：5万〜50万
-
-【出力ルール】
-・ビジネスLINE風
-・簡潔
-・商品名＋カテゴリ＋金額レンジ
-・最後に一言
-
-自然な査定文を作成してください。`
-});
+上記テキストと商品画像をもとに、実務で送る査定文を1通だけ作成してください。`
+      });
 
       for (const imageUrl of imageUrls) {
         userContent.push({
@@ -84,9 +65,14 @@ export default async function handler(req, res) {
         });
       }
 
-      // ④ OpenAIに送信
-      let replyText = "お問い合わせありがとうございます。\n内容を確認いたしました。\n\nお写真をもとに査定を進めてまいります。\n追加で確認事項がある場合はご連絡させていただきます。";
+      // ④ デフォルト文
+      let replyText = `お問い合わせありがとうございます。
+内容を確認いたしました。
 
+お写真をもとに査定を進めてまいります。
+追加で確認事項がある場合はご連絡させていただきます。`;
+
+      // ⑤ OpenAI で査定文生成
       if (OPENAI_API_KEY) {
         const aiRes = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -103,19 +89,40 @@ export default async function handler(req, res) {
                   {
                     type: "input_text",
                     text:
-                      `あなたはブランド品・時計・バッグ・ジュエリー・貴金属のLINE査定受付担当です。\n` +
-                      `役割は、画像とユーザー文面から分かる範囲で一次査定コメントを作ることです。\n\n` +
-                      `必ず守るルール:\n` +
-                      `- LINE向けの自然で短すぎない丁寧文\n` +
-                      `- 本物・偽物は断定しない\n` +
-                      `- 金額を出す場合は「参考」「目安」「前後」で表現する\n` +
-                      `- 画像で判断できる範囲は活用する\n` +
-                      `- 足りない情報があれば最後に最小限だけ聞く\n` +
-                      `- 画像枚数には触れない\n` +
-                      `- 返答はそのまま送れる完成文だけを出す\n\n` +
-                      `理想の文体:\n` +
-                      `お問い合わせありがとうございます。\n内容を確認いたしました。\n\n` +
-                      `お写真をもとに査定を進めてまいります。\n追加で確認事項がある場合はご連絡させていただきます。`
+                      `あなたはブランド買取店の査定担当者です。
+画像とユーザー文面から、実務ベースでリアルな査定コメントを作成してください。
+
+【査定ルール】
+- 中古買取相場ベースで出す
+- 状態により±30%調整
+- 人気ブランドは強気
+- ノーブランドは弱め
+- 不明な場合は無理に断定しない
+- 本物・偽物は断定しない
+
+【参考相場感】
+- ルイヴィトン バッグ：2万〜8万
+- シャネル バッグ：5万〜30万
+- エルメス バッグ：10万〜100万以上
+- カルティエ 小物：1万〜5万
+- ロレックス 時計：30万〜300万
+- オメガ 時計：5万〜50万
+
+【文体ルール】
+- ビジネスLINE風
+- 簡潔
+- 商品名＋カテゴリ＋金額レンジ
+- 最後に一言添える
+- 画像枚数には触れない
+- そのまま送れる完成文だけを出す
+
+【出力イメージ】
+いつも大変お世話になっております。
+ご連絡ありがとうございます。
+
+ルイヴィトン　バッグ　2.5〜3.0万
+
+ご確認の程、よろしくお願いいたします。`
                   }
                 ]
               },
@@ -123,7 +130,7 @@ export default async function handler(req, res) {
                 role: "user",
                 content: userContent
               }
-            ],
+            ]
           }),
         });
 
@@ -132,17 +139,18 @@ export default async function handler(req, res) {
         if (aiData.output_text && aiData.output_text.trim()) {
           replyText = aiData.output_text.trim();
         } else if (aiData.error?.message) {
-          replyText =
-            "お問い合わせありがとうございます。\n内容を確認いたしました。\n\nお写真をもとに査定を進めてまいります。\n追加で確認事項がある場合はご連絡させていただきます。";
+          replyText = `OpenAI error: ${aiData.error.message}`;
+        } else {
+          replyText = "OpenAI response was empty";
         }
       }
 
-      // LINE文字数対策
+      // ⑥ 文字数制限
       if (replyText.length > 4500) {
         replyText = replyText.slice(0, 4500);
       }
 
-      // ⑤ LINEに push 送信
+      // ⑦ LINEに push
       await fetch("https://api.line.me/v2/bot/message/push", {
         method: "POST",
         headers: {
@@ -160,7 +168,7 @@ export default async function handler(req, res) {
         }),
       });
 
-      // ⑥ 二重送信防止
+      // ⑧ 二重送信防止
       await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
         method: "PATCH",
         headers: {
