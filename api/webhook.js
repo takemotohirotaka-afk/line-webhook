@@ -37,7 +37,7 @@ const threeMinutesAgoIso = new Date(Date.now() - 1 * 60 * 1000).toISOString();
 
 // 3分以内の collecting inquiry を探す
 let inquiryRes = await fetch(
-  `${SUPABASE_URL}/rest/v1/inquiries?user_id=eq.${userId}&status=eq.collecting&last_message_at=gte.${encodeURIComponent(threeMinutesAgoIso)}&order=created_at.desc&limit=1`,
+  `${SUPABASE_URL}/rest/v1/inquiries?user_id=eq.${userId}&status=eq.collecting&last_message_at=gte.${encodeURIComponent(oneMinuteAgoIso)}&order=created_at.desc&limit=1`,
   {
     headers: {
       apikey: SUPABASE_KEY,
