@@ -2,6 +2,7 @@ export default async function handler(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
   const LINE_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
   try {
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
@@ -40,31 +41,87 @@ export default async function handler(req, res) {
         .filter((m) => m.type === "text" && m.text)
         .map((m) => m.text);
 
-      const images = messages
+      const imageUrls = messages
         .filter((m) => m.type === "image" && m.image_url)
         .map((m) => m.image_url);
 
-      // ③ 返信文を作る（今は仮）
-      let replyText = "お問い合わせありがとうございます。\n内容を確認いたしました。";
+      // ③ GPTに渡す入力を作る
+      const userContent = [];
 
-      if (texts.length > 0) {
-        replyText += `\n\nテキスト内容:\n${texts.join("\n")}`;
+      userContent.push({
+        type: "input_text",
+        text:
+          `以下はLINE査定のお問い合わせです。\n` +
+          `ユーザーから届いたテキスト:\n${texts.length ? texts.join("\n") : "（テキストなし）"}\n\n` +
+          `画像も合わせて確認し、LINEでそのまま送れる返信文を日本語で1通だけ作成してください。`
+      });
+
+      for (const imageUrl of imageUrls) {
+        userContent.push({
+          type: "input_image",
+          image_url: imageUrl,
+        });
       }
 
-      replyText += `\n\n画像枚数: ${images.length}枚`;
+      // ④ OpenAIに送信
+      let replyText = "お問い合わせありがとうございます。\n内容を確認いたしました。\n\nお写真をもとに査定を進めてまいります。\n追加で確認事項がある場合はご連絡させていただきます。";
 
-      if (images.length > 0) {
-        replyText += `\nお写真をもとに順次確認いたします。`;
+      if (OPENAI_API_KEY) {
+        const aiRes = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4.1-mini",
+            input: [
+              {
+                role: "system",
+                content: [
+                  {
+                    type: "input_text",
+                    text:
+                      `あなたはブランド品・時計・バッグ・ジュエリー・貴金属のLINE査定受付担当です。\n` +
+                      `役割は、画像とユーザー文面から分かる範囲で一次査定コメントを作ることです。\n\n` +
+                      `必ず守るルール:\n` +
+                      `- LINE向けの自然で短すぎない丁寧文\n` +
+                      `- 本物・偽物は断定しない\n` +
+                      `- 金額を出す場合は「参考」「目安」「前後」で表現する\n` +
+                      `- 画像で判断できる範囲は活用する\n` +
+                      `- 足りない情報があれば最後に最小限だけ聞く\n` +
+                      `- 画像枚数には触れない\n` +
+                      `- 返答はそのまま送れる完成文だけを出す\n\n` +
+                      `理想の文体:\n` +
+                      `お問い合わせありがとうございます。\n内容を確認いたしました。\n\n` +
+                      `お写真をもとに査定を進めてまいります。\n追加で確認事項がある場合はご連絡させていただきます。`
+                  }
+                ]
+              },
+              {
+                role: "user",
+                content: userContent
+              }
+            ],
+          }),
+        });
+
+        const aiData = await aiRes.json();
+
+        if (aiData.output_text && aiData.output_text.trim()) {
+          replyText = aiData.output_text.trim();
+        } else if (aiData.error?.message) {
+          replyText =
+            "お問い合わせありがとうございます。\n内容を確認いたしました。\n\nお写真をもとに査定を進めてまいります。\n追加で確認事項がある場合はご連絡させていただきます。";
+        }
       }
 
-      replyText += `\n\n担当よりご案内いたします。`;
-
-      // LINEの文字数制限対策
+      // LINE文字数対策
       if (replyText.length > 4500) {
         replyText = replyText.slice(0, 4500);
       }
 
-      // ④ LINEに push 送信
+      // ⑤ LINEに push 送信
       await fetch("https://api.line.me/v2/bot/message/push", {
         method: "POST",
         headers: {
@@ -82,7 +139,7 @@ export default async function handler(req, res) {
         }),
       });
 
-      // ⑤ 二重送信防止
+      // ⑥ 二重送信防止
       await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
         method: "PATCH",
         headers: {
