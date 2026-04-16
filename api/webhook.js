@@ -114,7 +114,18 @@ if (inquiries.length === 0) {
       image_url: imageUrl,
     }),
   });
-
+// last_message_at 更新
+await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
+  method: "PATCH",
+  headers: {
+    "Content-Type": "application/json",
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+  },
+  body: JSON.stringify({
+    last_message_at: new Date().toISOString(),
+  }),
+});
   continue;
 }
       // ① inquiry取得 or 作成
