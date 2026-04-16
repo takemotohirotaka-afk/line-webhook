@@ -33,7 +33,7 @@ if (event.message.type === "image") {
   const fileName = `${Date.now()}-${messageId}.jpg`;
 
  const nowIso = new Date().toISOString();
-const threeMinutesAgoIso = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+const threeMinutesAgoIso = new Date(Date.now() - 1 * 60 * 1000).toISOString();
 
 // 3分以内の collecting inquiry を探す
 let inquiryRes = await fetch(
