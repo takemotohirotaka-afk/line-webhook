@@ -100,9 +100,14 @@ export default async function handler(req, res) {
       });
 
       const aiData = await aiResponse.json();
-      const replyText =
-        aiData.choices?.[0]?.message?.content ||
-        "ありがとうございます。内容を確認しております。";
+
+console.log("OpenAI status:", aiResponse.status);
+console.log("OpenAI response:", JSON.stringify(aiData));
+
+const replyText =
+  aiData.choices?.[0]?.message?.content ||
+  aiData.error?.message ||
+  "エラーが発生しました。";
 
       await fetch("https://api.line.me/v2/bot/message/reply", {
         method: "POST",
