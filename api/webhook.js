@@ -100,19 +100,27 @@ export default async function handler(req, res) {
         const fileName = `${Date.now()}-${messageId}.jpg`;
 
         // Supabase Storage に保存
-        await fetch(
-          `${SUPABASE_URL}/storage/v1/object/line-images/${fileName}`,
-          {
-            method: "POST",
-            headers: {
-              apikey: SUPABASE_KEY,
-              Authorization: `Bearer ${SUPABASE_KEY}`,
-              "Content-Type": "image/jpeg",
-              "x-upsert": "true",
-            },
-            body: buffer,
-          }
-        );
+        const uploadRes = await fetch(
+  `${SUPABASE_URL}/storage/v1/object/line-images/${fileName}`,
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      apikey: SUPABASE_KEY,
+      "Content-Type": "image/jpeg",
+      "x-upsert": "true",
+    },
+    body: buffer,
+  }
+);
+
+console.log("upload status:", uploadRes.status);
+
+if (!uploadRes.ok) {
+  const errorText = await uploadRes.text();
+  console.log("upload error:", errorText);
+  throw new Error(`Supabase upload failed: ${uploadRes.status} ${errorText}`);
+}
 
         const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/line-images/${fileName}`;
 
