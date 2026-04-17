@@ -16,9 +16,9 @@ export default async function handler(req, res) {
 
       const userId = event.source.userId;
       const nowIso = new Date().toISOString();
-      const oneMinuteAgoIso = new Date(Date.now() - 1 * 60 * 1000).toISOString();
+      const oneMinuteAgoIso = new Date(Date.now() - 60 * 1000).toISOString();
 
-      // ① このユーザーの最新 collecting inquiry を1件だけ探す
+      // ① このユーザーの最新 collecting inquiry を1件だけ取得
       const inquiryRes = await fetch(
         `${SUPABASE_URL}/rest/v1/inquiries?user_id=eq.${userId}&status=eq.collecting&order=created_at.desc&limit=1`,
         {
@@ -37,7 +37,10 @@ export default async function handler(req, res) {
         const latestInquiry = inquiries[0];
         const baseTime = latestInquiry.last_message_at || latestInquiry.created_at;
 
-        if (baseTime && new Date(baseTime).getTime() >= new Date(oneMinuteAgoIso).getTime()) {
+        if (
+          baseTime &&
+          new Date(baseTime).getTime() >= new Date(oneMinuteAgoIso).getTime()
+        ) {
           inquiryId = latestInquiry.id;
         }
       }
@@ -85,7 +88,7 @@ export default async function handler(req, res) {
       if (event.message.type === "image") {
         const messageId = event.message.id;
 
-        // LINEから画像取得
+        // LINEから画像本体取得
         const imageRes = await fetch(
           `https://api-data.line.me/v2/bot/message/${messageId}/content`,
           {
@@ -101,28 +104,30 @@ export default async function handler(req, res) {
 
         // Supabase Storage に保存
         const uploadRes = await fetch(
-  `${SUPABASE_URL}/storage/v1/object/line-images/${fileName}`,
-  {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      apikey: SUPABASE_KEY,
-      "Content-Type": "image/jpeg",
-      "x-upsert": "true",
-    },
-    body: buffer,
-  }
-);
+          `${SUPABASE_URL}/storage/v1/object/line-images/${encodeURIComponent(fileName)}`,
+          {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              "Content-Type": "image/jpeg",
+              "x-upsert": "true",
+            },
+            body: buffer,
+          }
+        );
 
-console.log("upload status:", uploadRes.status);
+        console.log("upload status:", uploadRes.status);
 
-if (!uploadRes.ok) {
-  const errorText = await uploadRes.text();
-  console.log("upload error:", errorText);
-  throw new Error(`Supabase upload failed: ${uploadRes.status} ${errorText}`);
-}
+        if (!uploadRes.ok) {
+          const errorText = await uploadRes.text();
+          console.log("upload error:", errorText);
+          throw new Error(
+            `Supabase upload failed: ${uploadRes.status} ${errorText}`
+          );
+        }
 
-        const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/line-images/${fileName}`;
+        const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/line-images/${encodeURIComponent(fileName)}`;
 
         // messages テーブルに保存
         await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
