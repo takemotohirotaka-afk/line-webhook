@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     const now = Date.now();
     const oneMinuteMs = 60 * 1000;
 
-    // ① collecting & 未返信 を全部取る
+    // ① collecting & 未返信 を全部取得
     const inquiryRes = await fetch(
       `${SUPABASE_URL}/rest/v1/inquiries?status=eq.collecting&replied_at=is.null&order=created_at.asc`,
       {
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     const allInquiries = await inquiryRes.json();
 
-    // ② JS側で「1分経過したものだけ」に絞る
+    // ② JS側で1分経過したものだけ対象にする
     const inquiries = allInquiries.filter((inquiry) => {
       const baseTime = inquiry.last_message_at || inquiry.created_at;
       if (!baseTime) return false;
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       const inquiryId = inquiry.id;
       const userId = inquiry.user_id;
 
-      // ③ messages を取得
+      // ③ messages 取得
       const msgRes = await fetch(
         `${SUPABASE_URL}/rest/v1/messages?inquiry_id=eq.${inquiryId}&order=created_at.asc`,
         {
@@ -78,6 +78,7 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
 お写真をもとに査定を進めてまいります。
 追加で確認事項がある場合はご連絡させていただきます。`;
 
+      // ④ OpenAIで査定文作成
       if (OPENAI_API_KEY) {
         const aiRes = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -87,14 +88,19 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
           },
           body: JSON.stringify({
             model: "gpt-4.1-mini",
+            text: {
+              format: {
+                type: "text"
+              }
+            },
+            max_output_tokens: 500,
             input: [
               {
                 role: "system",
                 content: [
                   {
                     type: "input_text",
-                    text:
-                      `あなたはブランド買取店の査定担当者です。
+                    text: `あなたはブランド買取店の査定担当者です。
 画像とユーザー文面から、実務ベースでリアルな査定コメントを作成してください。
 
 【査定ルール】
@@ -140,13 +146,34 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
         });
 
         const aiData = await aiRes.json();
+        console.log("OpenAI raw response:", JSON.stringify(aiData, null, 2));
 
-        if (aiData.output_text && aiData.output_text.trim()) {
-          replyText = aiData.output_text.trim();
-        } else if (aiData.error?.message) {
+        if (aiData.error?.message) {
           replyText = `OpenAI error: ${aiData.error.message}`;
+        } else if (aiData.output_text && aiData.output_text.trim()) {
+          replyText = aiData.output_text.trim();
         } else {
-          replyText = "OpenAI response was empty";
+          const textParts = [];
+
+          if (Array.isArray(aiData.output)) {
+            for (const item of aiData.output) {
+              if (item.type === "message" && Array.isArray(item.content)) {
+                for (const c of item.content) {
+                  if (c.type === "output_text" && c.text) {
+                    textParts.push(c.text);
+                  }
+                }
+              }
+            }
+          }
+
+          if (textParts.length > 0) {
+            replyText = textParts.join("\n").trim();
+          } else if (aiData.incomplete_details?.reason) {
+            replyText = `OpenAI incomplete: ${aiData.incomplete_details.reason}`;
+          } else {
+            replyText = "OpenAI response was empty";
+          }
         }
       }
 
@@ -154,8 +181,8 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
         replyText = replyText.slice(0, 4500);
       }
 
-      // ④ LINEに push
-      await fetch("https://api.line.me/v2/bot/message/push", {
+      // ⑤ LINEに push
+      const pushRes = await fetch("https://api.line.me/v2/bot/message/push", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -172,7 +199,15 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
         }),
       });
 
-      // ⑤ 返信済みにする
+      console.log("LINE push status:", pushRes.status);
+
+      if (!pushRes.ok) {
+        const lineError = await pushRes.text();
+        console.log("LINE push error:", lineError);
+        throw new Error(`LINE push failed: ${pushRes.status} ${lineError}`);
+      }
+
+      // ⑥ 返信済みに更新
       await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
         method: "PATCH",
         headers: {
