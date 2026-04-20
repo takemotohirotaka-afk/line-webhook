@@ -247,13 +247,6 @@ let aiMax = null;
   "ai_estimated_max": 80000
 }`
 
-【出力イメージ】
-いつも大変お世話になっております。
-ご連絡ありがとうございます。
-
-ルイヴィトン　バッグ　2.5〜3.0万
-
-ご確認の程、よろしくお願いいたします。`
                   }
                 ]
               },
@@ -268,33 +261,47 @@ let aiMax = null;
         const aiData = await aiRes.json();
         console.log("OpenAI raw response:", JSON.stringify(aiData, null, 2));
 
-        if (aiData.error?.message) {
-          replyText = `OpenAI error: ${aiData.error.message}`;
-        } else if (aiData.output_text && aiData.output_text.trim()) {
-          replyText = aiData.output_text.trim();
-        } else {
-          const textParts = [];
+if (aiData.error?.message) {
+  replyText = `OpenAI error: ${aiData.error.message}`;
+} else {
+  let rawText = "";
 
-          if (Array.isArray(aiData.output)) {
-            for (const item of aiData.output) {
-              if (item.type === "message" && Array.isArray(item.content)) {
-                for (const c of item.content) {
-                  if (c.type === "output_text" && c.text) {
-                    textParts.push(c.text);
-                  }
-                }
-              }
+  if (aiData.output_text && aiData.output_text.trim()) {
+    rawText = aiData.output_text.trim();
+  } else {
+    const textParts = [];
+
+    if (Array.isArray(aiData.output)) {
+      for (const item of aiData.output) {
+        if (item.type === "message" && Array.isArray(item.content)) {
+          for (const c of item.content) {
+            if (c.type === "output_text" && c.text) {
+              textParts.push(c.text);
             }
           }
-
-          if (textParts.length > 0) {
-            replyText = textParts.join("\n").trim();
-          } else if (aiData.incomplete_details?.reason) {
-            replyText = `OpenAI incomplete: ${aiData.incomplete_details.reason}`;
-          } else {
-            replyText = "OpenAI response was empty";
-          }
         }
+      }
+    }
+
+    if (textParts.length > 0) {
+      rawText = textParts.join("\n").trim();
+    } else if (aiData.incomplete_details?.reason) {
+      rawText = `{"reply_text":"OpenAI incomplete: ${aiData.incomplete_details.reason}","ai_estimated_min":null,"ai_estimated_max":null}`;
+    } else {
+      rawText = `{"reply_text":"OpenAI response was empty","ai_estimated_min":null,"ai_estimated_max":null}`;
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(rawText);
+    replyText = parsed.reply_text || replyText;
+    aiMin = Number.isFinite(parsed.ai_estimated_min) ? parsed.ai_estimated_min : null;
+    aiMax = Number.isFinite(parsed.ai_estimated_max) ? parsed.ai_estimated_max : null;
+  } catch (e) {
+    console.log("AI JSON parse error:", rawText);
+    replyText = rawText;
+  }
+}
       }
 
       if (replyText.length > 4500) {
