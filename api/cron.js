@@ -43,34 +43,56 @@ export default async function handler(req, res) {
         }
       );
 
-      const messages = await msgRes.json();
+    const messages = await msgRes.json();
 
-      const texts = messages
-        .filter((m) => m.type === "text" && m.text)
-        .map((m) => m.text);
+const texts = messages
+  .filter((m) => m.type === "text" && m.text)
+  .map((m) => m.text);
 
-      const imageUrls = messages
-        .filter((m) => m.type === "image" && m.image_url)
-        .map((m) => m.image_url);
+const imageUrls = messages
+  .filter((m) => m.type === "image" && m.image_url)
+  .map((m) => m.image_url);
 
-      const userContent = [];
+// 過去査定を取得
+const similarRes = await fetch(
+  `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&order=created_at.desc&limit=5`,
+  {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
+  }
+);
 
-      userContent.push({
-        type: "input_text",
-        text: `以下はブランド査定のお問い合わせです。
+const similarAppraisals = await similarRes.json();
+
+const userContent = [];
+
+userContent.push({
+  type: "input_text",
+  text: `以下はブランド査定のお問い合わせです。
 
 ユーザーからのテキスト：
 ${texts.length ? texts.join("\n") : "（テキストなし）"}
 
 上記テキストと商品画像をもとに、実務で送る査定文を1通だけ作成してください。`
-      });
+});
 
-      for (const imageUrl of imageUrls) {
-        userContent.push({
-          type: "input_image",
-          image_url: imageUrl,
-        });
-      }
+userContent.push({
+  type: "input_text",
+  text: `以下は過去の査定履歴です。今回の査定文を作る参考にしてください。
+ただし今回の商品と明らかに違う場合は無理に合わせないでください。
+
+過去査定履歴:
+${similarAppraisals.length ? JSON.stringify(similarAppraisals, null, 2) : "該当なし"}`
+});
+
+for (const imageUrl of imageUrls) {
+  userContent.push({
+    type: "input_image",
+    image_url: imageUrl,
+  });
+}
 
       let replyText = `お問い合わせありがとうございます。
 内容を確認いたしました。
@@ -106,6 +128,7 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
 【査定ルール】
 - 中古買取相場ベースで出す
 - 状態により±30%調整
+- 過去査定履歴がある場合は、今回の商品と近い内容を参考にして査定文のブレを抑える
 - 人気ブランドは強気
 - ノーブランドは弱め
 - 不明な場合は無理に断定しない
