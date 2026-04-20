@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const LINE_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -206,8 +206,44 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
         console.log("LINE push error:", lineError);
         throw new Error(`LINE push failed: ${pushRes.status} ${lineError}`);
       }
+// ⑥ appraisals に保存
+await fetch(`${SUPABASE_URL}/rest/v1/appraisals`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+  },
+  body: JSON.stringify({
+    inquiry_id: inquiryId,
+    line_user_id: userId,
 
-      // ⑥ 返信済みに更新
+    brand: null,
+    category: null,
+    model_name: null,
+    reference_no: null,
+    material: null,
+    color: null,
+    condition_rank: null,
+
+    accessories: [],
+    normalized_title: null,
+
+    market_prices: [],
+    past_similar_results: [],
+
+    ai_estimated_min: null,
+    ai_estimated_max: null,
+    final_offer_min: null,
+    final_offer_max: null,
+
+    confidence: null,
+    reasoning: {},
+
+    reply_text: replyText,
+  }),
+});
+      // ⑦ 返信済みに更新
       await fetch(`${SUPABASE_URL}/rest/v1/inquiries?id=eq.${inquiryId}`, {
         method: "PATCH",
         headers: {
