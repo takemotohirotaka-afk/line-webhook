@@ -49,38 +49,7 @@ const texts = messages
   .filter((m) => m.type === "text" && m.text)
   .map((m) => m.text);
 
-const imageUrls = messages
-  .filter((m) => m.type === "image" && m.image_url)
-  .map((m) => m.image_url);
-const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
 
-const userContent = [];
-
-userContent.push({
-  type: "input_text",
-  text: `以下はブランド査定のお問い合わせです。
-
-ユーザーからのテキスト：
-${texts.length ? texts.join("\n") : "（テキストなし）"}
-
-上記テキストと商品画像をもとに、実務で送る査定文を1通だけ作成してください。`
-});
-
-userContent.push({
-  type: "input_text",
-  text: `以下は過去の査定履歴です。今回の査定文を作る参考にしてください。
-ただし今回の商品と明らかに違う場合は無理に合わせないでください。
-
-過去査定履歴:
-${similarAppraisals.length ? JSON.stringify(similarAppraisals, null, 2) : "該当なし"}`
-});
-
-for (const imageUrl of imageUrls) {
-  userContent.push({
-    type: "input_image",
-    image_url: imageUrl,
-  });
-}
 // 🔍 ブランド抽出
 let detectedBrand = null;
 
@@ -123,7 +92,38 @@ const similarRes = await fetch(
 );
 
 const similarAppraisals = await similarRes.json();
+const imageUrls = messages
+  .filter((m) => m.type === "image" && m.image_url)
+  .map((m) => m.image_url);
+const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
 
+const userContent = [];
+
+userContent.push({
+  type: "input_text",
+  text: `以下はブランド査定のお問い合わせです。
+
+ユーザーからのテキスト：
+${texts.length ? texts.join("\n") : "（テキストなし）"}
+
+上記テキストと商品画像をもとに、実務で送る査定文を1通だけ作成してください。`
+});
+
+userContent.push({
+  type: "input_text",
+  text: `以下は過去の査定履歴です。今回の査定文を作る参考にしてください。
+ただし今回の商品と明らかに違う場合は無理に合わせないでください。
+
+過去査定履歴:
+${similarAppraisals.length ? JSON.stringify(similarAppraisals, null, 2) : "該当なし"}`
+});
+
+for (const imageUrl of imageUrls) {
+  userContent.push({
+    type: "input_image",
+    image_url: imageUrl,
+  });
+}
       let replyText = `お問い合わせありがとうございます。
 内容を確認いたしました。
 
