@@ -43,12 +43,17 @@ export default async function handler(req, res) {
         }
       );
 
-    const messages = await msgRes.json();
+const messages = await msgRes.json();
 
 const texts = messages
   .filter((m) => m.type === "text" && m.text)
   .map((m) => m.text);
 
+const imageUrls = messages
+  .filter((m) => m.type === "image" && m.image_url)
+  .map((m) => m.image_url);
+
+const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
 
 // 🔍 ブランド抽出
 let detectedBrand = null;
@@ -72,14 +77,16 @@ ${texts.join(" ")}`,
 
   const extractData = await extractRes.json();
   detectedBrand =
-  extractData.output?.[0]?.content?.[0]?.text?.trim() || null;
+    extractData.output?.[0]?.content?.[0]?.text?.trim() || null;
 } catch (e) {
   console.log("brand extract error:", e);
 }
+
 const brandFilter =
   detectedBrand && detectedBrand.toLowerCase() !== "null"
     ? `brand=ilike.%${encodeURIComponent(detectedBrand)}%`
     : `reply_text=ilike.%${encodeURIComponent(keyword)}%`;
+
 // 過去査定を取得
 const similarRes = await fetch(
   `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${brandFilter}&order=created_at.desc&limit=5`,
@@ -91,7 +98,14 @@ const similarRes = await fetch(
   }
 );
 
+if (!similarRes.ok) {
+  const similarError = await similarRes.text();
+  console.log("similarRes error:", similarError);
+  throw new Error(`similarRes failed: ${similarRes.status} ${similarError}`);
+}
+
 const similarAppraisals = await similarRes.json();
+
 const userContent = [];
 
 userContent.push({
