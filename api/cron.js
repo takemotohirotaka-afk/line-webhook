@@ -65,19 +65,58 @@ try {
       "Content-Type": "application/json",
       Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      input: `以下のテキストからブランド名を1つだけ抽出してください。
-該当しない場合は null と返してください。
+const brandExtractInput = [
+  {
+    role: "system",
+    content: [
+      {
+        type: "input_text",
+        text: `あなたはブランド品査定の補助AIです。
+ユーザーのテキストと画像から、ブランド名を1つだけ抽出してください。
 
-テキスト:
-${texts.join(" ")}`,
-    }),
-  });
+ルール:
+- ブランド名だけ返す
+- 分からない場合は null
+- 本物/偽物の断定はしない
+- 余計な説明は書かない`
+      }
+    ]
+  },
+  {
+    role: "user",
+    content: [
+      {
+        type: "input_text",
+        text: `ユーザーのテキスト:
+${texts.length ? texts.join("\n") : "（テキストなし）"}`
+      },
+      ...imageUrls.map((imageUrl) => ({
+        type: "input_image",
+        image_url: imageUrl,
+      }))
+    ]
+  }
+];
 
+const extractRes = await fetch("https://api.openai.com/v1/responses", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${OPENAI_API_KEY}`,
+  },
+  body: JSON.stringify({
+    model: "gpt-4.1-mini",
+    input: brandExtractInput,
+  }),
+});
   const extractData = await extractRes.json();
-  detectedBrand =
-    extractData.output?.[0]?.content?.[0]?.text?.trim() || null;
+
+console.log("detectedBrand raw:", JSON.stringify(extractData, null, 2));
+
+detectedBrand =
+  extractData.output?.[0]?.content?.[0]?.text?.trim() || null;
+
+console.log("detectedBrand parsed:", detectedBrand);
 } catch (e) {
   console.log("brand extract error:", e);
 }
