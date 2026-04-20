@@ -88,24 +88,28 @@ const brandFilter =
     : `reply_text=ilike.*${encodeURIComponent(keyword)}*`;
 
 // 過去査定を取得
-const similarRes = await fetch(
-  `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${brandFilter}&order=created_at.desc&limit=5`,
-  {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-    },
+let similarAppraisals = [];
+
+try {
+  const similarRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${brandFilter}&order=created_at.desc&limit=5`,
+    {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    }
+  );
+
+  if (!similarRes.ok) {
+    const similarError = await similarRes.text();
+    console.log("similarRes error:", similarError);
+  } else {
+    similarAppraisals = await similarRes.json();
   }
-);
-
-if (!similarRes.ok) {
-  const similarError = await similarRes.text();
-  console.log("similarRes error:", similarError);
-  throw new Error(`similarRes failed: ${similarRes.status} ${similarError}`);
+} catch (e) {
+  console.log("similar fetch error:", e);
 }
-
-const similarAppraisals = await similarRes.json();
-
 const userContent = [];
 
 userContent.push({
