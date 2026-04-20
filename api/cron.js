@@ -56,9 +56,6 @@ const imageUrls = messages
 // いったん復旧優先で固定
 let detectedBrand = null;
 let similarAppraisals = [];
-let detectedBrand = null;
-let similarAppraisals = [];
-
 try {
   const brandExtractInput = [
     {
