@@ -113,6 +113,35 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}`
 } catch (e) {
   console.log("brand extract error:", e);
 }
+
+const brandFilter =
+  detectedBrand && detectedBrand.toLowerCase() !== "null"
+    ? `brand=ilike.*${encodeURIComponent(detectedBrand)}*`
+    : null;
+
+if (brandFilter) {
+  try {
+    const similarRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${brandFilter}&order=created_at.desc&limit=5`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    );
+
+    if (!similarRes.ok) {
+      const similarError = await similarRes.text();
+      console.log("similarRes error:", similarError);
+    } else {
+      similarAppraisals = await similarRes.json();
+      console.log("similarAppraisals count:", similarAppraisals.length);
+    }
+  } catch (e) {
+    console.log("similar fetch error:", e);
+  }
+}
 const userContent = [];
 
 userContent.push({
@@ -125,6 +154,18 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
 上記テキストと商品画像をもとに、実務で送る査定文を1通だけ作成してください。`
 });
 
+if (similarAppraisals.length > 0) {
+  userContent.push({
+    type: "input_text",
+text: `以下は同ブランドの過去査定履歴です。
+今回の査定文は必ずこの価格帯を参考にしてください。
+ただし今回の商品と明らかに違う場合は無理に合わせないでください。
+
+過去査定履歴:
+${JSON.stringify(similarAppraisals, null, 2)}`
+  });
+}
+      
 for (const imageUrl of imageUrls) {
   userContent.push({
     type: "input_image",
