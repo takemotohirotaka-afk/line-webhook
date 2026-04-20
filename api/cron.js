@@ -172,12 +172,14 @@ for (const imageUrl of imageUrls) {
     image_url: imageUrl,
   });
 }
-      let replyText = `お問い合わせありがとうございます。
+let replyText = `お問い合わせありがとうございます。
 内容を確認いたしました。
 
 お写真をもとに査定を進めてまいります。
 追加で確認事項がある場合はご連絡させていただきます。`;
 
+let aiMin = null;
+let aiMax = null;
       // ④ OpenAIで査定文作成
       if (OPENAI_API_KEY) {
         const aiRes = await fetch("https://api.openai.com/v1/responses", {
@@ -227,6 +229,23 @@ for (const imageUrl of imageUrls) {
 - 最後に一言添える
 - 画像枚数には触れない
 - そのまま送れる完成文だけを出す
+
+【文体ルール】
+- ビジネスLINE風
+- 簡潔
+- 商品名＋カテゴリ＋金額レンジ
+- 最後に一言添える
+- 画像枚数には触れない
+
+【出力ルール】
+必ずJSONのみを出力してください。
+説明文やコードブロックは不要です。
+
+{
+  "reply_text": "そのままLINEで送れる査定文",
+  "ai_estimated_min": 50000,
+  "ai_estimated_max": 80000
+}`
 
 【出力イメージ】
 いつも大変お世話になっております。
