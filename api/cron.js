@@ -52,10 +52,10 @@ const texts = messages
 const imageUrls = messages
   .filter((m) => m.type === "image" && m.image_url)
   .map((m) => m.image_url);
-
+const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
 // 過去査定を取得
 const similarRes = await fetch(
-  `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&order=created_at.desc&limit=5`,
+  `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&reply_text=ilike.%${encodeURIComponent(keyword)}%&order=created_at.desc&limit=5`,
   {
     headers: {
       apikey: SUPABASE_KEY,
