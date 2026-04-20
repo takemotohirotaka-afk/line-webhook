@@ -53,102 +53,10 @@ const imageUrls = messages
   .filter((m) => m.type === "image" && m.image_url)
   .map((m) => m.image_url);
 
-const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
-
-// 🔍 ブランド抽出
+// いったん復旧優先で固定
 let detectedBrand = null;
-
-try {
-  const extractRes = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-const brandExtractInput = [
-  {
-    role: "system",
-    content: [
-      {
-        type: "input_text",
-        text: `あなたはブランド品査定の補助AIです。
-ユーザーのテキストと画像から、ブランド名を1つだけ抽出してください。
-
-ルール:
-- ブランド名だけ返す
-- 分からない場合は null
-- 本物/偽物の断定はしない
-- 余計な説明は書かない`
-      }
-    ]
-  },
-  {
-    role: "user",
-    content: [
-      {
-        type: "input_text",
-        text: `ユーザーのテキスト:
-${texts.length ? texts.join("\n") : "（テキストなし）"}`
-      },
-      ...imageUrls.map((imageUrl) => ({
-        type: "input_image",
-        image_url: imageUrl,
-      }))
-    ]
-  }
-];
-
-const extractRes = await fetch("https://api.openai.com/v1/responses", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${OPENAI_API_KEY}`,
-  },
-  body: JSON.stringify({
-    model: "gpt-4.1-mini",
-    input: brandExtractInput,
-  }),
-});
-  const extractData = await extractRes.json();
-
-console.log("detectedBrand raw:", JSON.stringify(extractData, null, 2));
-
-detectedBrand =
-  extractData.output?.[0]?.content?.[0]?.text?.trim() || null;
-
-console.log("detectedBrand parsed:", detectedBrand);
-} catch (e) {
-  console.log("brand extract error:", e);
-}
-
-const brandFilter =
-  detectedBrand && detectedBrand.toLowerCase() !== "null"
-    ? `brand=ilike.*${encodeURIComponent(detectedBrand)}*`
-    : `reply_text=ilike.*${encodeURIComponent(keyword)}*`;
-
-// 過去査定を取得
 let similarAppraisals = [];
 
-try {
-  const similarRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${brandFilter}&order=created_at.desc&limit=5`,
-    {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-      },
-    }
-  );
-
-  if (!similarRes.ok) {
-    const similarError = await similarRes.text();
-    console.log("similarRes error:", similarError);
-  } else {
-    similarAppraisals = await similarRes.json();
-  }
-} catch (e) {
-  console.log("similar fetch error:", e);
-}
 const userContent = [];
 
 userContent.push({
@@ -161,22 +69,12 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}
 上記テキストと商品画像をもとに、実務で送る査定文を1通だけ作成してください。`
 });
 
-userContent.push({
-  type: "input_text",
-  text: `以下は過去の査定履歴です。今回の査定文を作る参考にしてください。
-ただし今回の商品と明らかに違う場合は無理に合わせないでください。
-
-過去査定履歴:
-${similarAppraisals.length ? JSON.stringify(similarAppraisals, null, 2) : "該当なし"}`
-});
-
 for (const imageUrl of imageUrls) {
   userContent.push({
     type: "input_image",
     image_url: imageUrl,
   });
 }
-
       let replyText = `お問い合わせありがとうございます。
 内容を確認いたしました。
 
