@@ -92,11 +92,6 @@ const similarRes = await fetch(
 );
 
 const similarAppraisals = await similarRes.json();
-const imageUrls = messages
-  .filter((m) => m.type === "image" && m.image_url)
-  .map((m) => m.image_url);
-const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
-
 const userContent = [];
 
 userContent.push({
@@ -124,6 +119,11 @@ for (const imageUrl of imageUrls) {
     image_url: imageUrl,
   });
 }
+const imageUrls = messages
+  .filter((m) => m.type === "image" && m.image_url)
+  .map((m) => m.image_url);
+const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
+
       let replyText = `お問い合わせありがとうございます。
 内容を確認いたしました。
 
