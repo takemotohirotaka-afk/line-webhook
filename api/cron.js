@@ -271,7 +271,9 @@ await fetch(`${SUPABASE_URL}/rest/v1/appraisals`, {
     inquiry_id: inquiryId,
     line_user_id: userId,
 
-    brand: null,
+   brand: detectedBrand && detectedBrand.toLowerCase() !== "null"
+  ? detectedBrand
+  : null,
     category: null,
     model_name: null,
     reference_no: null,
@@ -283,7 +285,7 @@ await fetch(`${SUPABASE_URL}/rest/v1/appraisals`, {
     normalized_title: null,
 
     market_prices: [],
-    past_similar_results: [],
+    past_similar_results: similarAppraisals ?? [],
 
     ai_estimated_min: null,
     ai_estimated_max: null,
@@ -291,8 +293,10 @@ await fetch(`${SUPABASE_URL}/rest/v1/appraisals`, {
     final_offer_max: null,
 
     confidence: null,
-    reasoning: {},
-
+   reasoning: {
+  detectedBrand: detectedBrand ?? null,
+  similarCount: similarAppraisals?.length ?? 0,
+},
     reply_text: replyText,
   }),
 });
