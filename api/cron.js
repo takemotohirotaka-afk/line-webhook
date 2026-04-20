@@ -53,18 +53,6 @@ const imageUrls = messages
   .filter((m) => m.type === "image" && m.image_url)
   .map((m) => m.image_url);
 const keyword = texts.join(" ").trim().slice(0, 50) || "査定";
-// 過去査定を取得
-const similarRes = await fetch(
-  `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&reply_text=ilike.%${encodeURIComponent(keyword)}%&order=created_at.desc&limit=5`,
-  {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-    },
-  }
-);
-
-const similarAppraisals = await similarRes.json();
 
 const userContent = [];
 
@@ -93,6 +81,48 @@ for (const imageUrl of imageUrls) {
     image_url: imageUrl,
   });
 }
+// 🔍 ブランド抽出
+let detectedBrand = null;
+
+try {
+  const extractRes = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
+      input: `以下のテキストからブランド名を1つだけ抽出してください。
+該当しない場合は null と返してください。
+
+テキスト:
+${texts.join(" ")}`,
+    }),
+  });
+
+  const extractData = await extractRes.json();
+  detectedBrand =
+  extractData.output?.[0]?.content?.[0]?.text?.trim() || null;
+} catch (e) {
+  console.log("brand extract error:", e);
+}
+const brandFilter =
+  detectedBrand && detectedBrand.toLowerCase() !== "null"
+    ? `brand=ilike.%${encodeURIComponent(detectedBrand)}%`
+    : `reply_text=ilike.%${encodeURIComponent(keyword)}%`;
+// 過去査定を取得
+const similarRes = await fetch(
+  `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${brandFilter}&order=created_at.desc&limit=5`,
+  {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    },
+  }
+);
+
+const similarAppraisals = await similarRes.json();
 
       let replyText = `お問い合わせありがとうございます。
 内容を確認いたしました。
