@@ -84,8 +84,8 @@ ${texts.join(" ")}`,
 
 const brandFilter =
   detectedBrand && detectedBrand.toLowerCase() !== "null"
-    ? `brand=ilike.%${encodeURIComponent(detectedBrand)}%`
-    : `reply_text=ilike.%${encodeURIComponent(keyword)}%`;
+    ? `brand=ilike.*${encodeURIComponent(detectedBrand)}*`
+    : `reply_text=ilike.*${encodeURIComponent(keyword)}*`;
 
 // 過去査定を取得
 const similarRes = await fetch(
