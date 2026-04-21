@@ -124,7 +124,59 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}`
 }
 
 try {
-  // brand抽出
+  const brandInput = [
+    {
+      role: "system",
+      content: [
+        {
+          type: "input_text",
+          text: `あなたはブランド抽出AIです。
+ユーザーのテキストと画像からブランド名を1つだけ抽出してください。
+
+ルール:
+- ブランド名だけ返す
+- 不明なら null
+- 余計な説明は禁止`
+        }
+      ]
+    },
+    {
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: `ユーザーのテキスト:
+${texts.length ? texts.join("\n") : "（テキストなし）"}`
+        },
+        ...imageUrls.map((imageUrl) => ({
+          type: "input_image",
+          image_url: imageUrl,
+        }))
+      ]
+    }
+  ];
+
+  const brandRes = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
+      input: brandInput,
+    }),
+  });
+
+  const brandData = await brandRes.json();
+
+  console.log("detectedBrand raw:", JSON.stringify(brandData, null, 2));
+
+  detectedBrand =
+    brandData.output?.[0]?.content?.[0]?.text?.trim() || null;
+
+  console.log("detectedBrand parsed:", detectedBrand);
+
 } catch (e) {
   console.log("brand extract error:", e);
 }
