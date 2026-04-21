@@ -123,6 +123,12 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}`
   console.log("category extract error:", e);
 }
 
+try {
+  // brand抽出
+} catch (e) {
+  console.log("brand extract error:", e);
+}
+
 const brandFilter =
   detectedBrand && detectedBrand.toLowerCase() !== "null"
     ? `brand=ilike.*${encodeURIComponent(detectedBrand)}*`
