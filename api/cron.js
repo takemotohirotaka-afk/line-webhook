@@ -367,7 +367,7 @@ await fetch(`${SUPABASE_URL}/rest/v1/appraisals`, {
    brand: detectedBrand && detectedBrand.toLowerCase() !== "null"
   ? detectedBrand
   : null,
-    category: null,
+   category: detectedCategory !== "不明" ? detectedCategory : null,
     model_name: null,
     reference_no: null,
     material: null,
