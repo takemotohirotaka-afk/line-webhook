@@ -122,6 +122,7 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}`
 } catch (e) {
   console.log("category extract error:", e);
 }
+
 const brandFilter =
   detectedBrand && detectedBrand.toLowerCase() !== "null"
     ? `brand=ilike.*${encodeURIComponent(detectedBrand)}*`
