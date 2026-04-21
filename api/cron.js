@@ -240,6 +240,8 @@ let aiMax = null;
 【出力ルール】
 必ずJSONのみを出力してください。
 説明文やコードブロックは不要です。
+金額は必ず半角数字で返してください。
+不明な場合のみ null を返してください。
 
 {
   "reply_text": "そのままLINEで送れる査定文",
@@ -297,10 +299,19 @@ if (aiData.error?.message) {
     replyText = parsed.reply_text || replyText;
     aiMin = Number.isFinite(parsed.ai_estimated_min) ? parsed.ai_estimated_min : null;
     aiMax = Number.isFinite(parsed.ai_estimated_max) ? parsed.ai_estimated_max : null;
-  } catch (e) {
-    console.log("AI JSON parse error:", rawText);
-    replyText = rawText;
+ } catch (e) {
+  console.log("AI JSON parse error:", rawText);
+
+  replyText = rawText;
+
+  const priceMatches =
+    rawText.match(/\d[\d,]*/g)?.map((v) => Number(v.replace(/,/g, ""))) || [];
+
+  if (priceMatches.length >= 2) {
+    aiMin = priceMatches[0];
+    aiMax = priceMatches[1];
   }
+}
 }
       }
 
@@ -361,10 +372,10 @@ await fetch(`${SUPABASE_URL}/rest/v1/appraisals`, {
     market_prices: [],
     past_similar_results: similarAppraisals ?? [],
 
-    ai_estimated_min: null,
-    ai_estimated_max: null,
-    final_offer_min: null,
-    final_offer_max: null,
+   ai_estimated_min: aiMin,
+　 ai_estimated_max: aiMax,
+   final_offer_min: aiMin,
+   final_offer_max: aiMax,
 
     confidence: null,
    reasoning: {
