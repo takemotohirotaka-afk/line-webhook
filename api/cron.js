@@ -55,20 +55,29 @@ const imageUrls = messages
 
 // いったん復旧優先で固定
 let detectedBrand = null;
+let detectedCategory = null;
 let similarAppraisals = [];
+
 try {
-  const brandExtractInput = [
+  const categoryInput = [
     {
       role: "system",
       content: [
         {
           type: "input_text",
           text: `あなたはブランド品査定の補助AIです。
-ユーザーのテキストと画像から、ブランド名を1つだけ抽出してください。
+ユーザーのテキストと画像から、カテゴリを1つだけ選んでください。
+
+候補:
+- バッグ
+- 時計
+- ジュエリー
+- 財布小物
+- 不明
 
 ルール:
-- ブランド名だけ返す
-- 分からない場合は null
+- 必ず上の候補から1つだけ返す
+- 分からない場合は 不明
 - 余計な説明は書かない`
         }
       ]
@@ -89,7 +98,7 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}`
     }
   ];
 
-  const extractRes = await fetch("https://api.openai.com/v1/responses", {
+  const categoryRes = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -97,23 +106,22 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}`
     },
     body: JSON.stringify({
       model: "gpt-4.1-mini",
-      input: brandExtractInput,
+      input: categoryInput,
     }),
   });
 
-  const extractData = await extractRes.json();
+  const categoryData = await categoryRes.json();
 
-  console.log("detectedBrand raw:", JSON.stringify(extractData, null, 2));
+  console.log("detectedCategory raw:", JSON.stringify(categoryData, null, 2));
 
-  detectedBrand =
-    extractData.output?.[0]?.content?.[0]?.text?.trim() || null;
+  detectedCategory =
+    categoryData.output?.[0]?.content?.[0]?.text?.trim() || "不明";
 
-  console.log("detectedBrand parsed:", detectedBrand);
+  console.log("detectedCategory parsed:", detectedCategory);
 
 } catch (e) {
-  console.log("brand extract error:", e);
+  console.log("category extract error:", e);
 }
-
 const brandFilter =
   detectedBrand && detectedBrand.toLowerCase() !== "null"
     ? `brand=ilike.*${encodeURIComponent(detectedBrand)}*`
