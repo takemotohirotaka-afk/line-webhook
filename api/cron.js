@@ -181,15 +181,22 @@ ${texts.length ? texts.join("\n") : "（テキストなし）"}`
   console.log("brand extract error:", e);
 }
 
-const brandFilter =
-  detectedBrand && detectedBrand.toLowerCase() !== "null"
-    ? `brand=ilike.*${encodeURIComponent(detectedBrand)}*`
-    : null;
+const filters = [];
 
-if (brandFilter) {
+if (detectedBrand && detectedBrand.toLowerCase() !== "null") {
+  filters.push(`brand=ilike.*${encodeURIComponent(detectedBrand)}*`);
+}
+
+if (detectedCategory && detectedCategory !== "不明") {
+  filters.push(`category=eq.${encodeURIComponent(detectedCategory)}`);
+}
+
+const filterQuery = filters.join("&");
+
+if (filterQuery) {
   try {
     const similarRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${brandFilter}&order=created_at.desc&limit=5`,
+      `${SUPABASE_URL}/rest/v1/appraisals?select=id,reply_text,created_at,brand,category,model_name,final_offer_min,final_offer_max,confidence&${filterQuery}&order=created_at.desc&limit=5`,
       {
         headers: {
           apikey: SUPABASE_KEY,
